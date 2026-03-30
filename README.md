@@ -8,10 +8,31 @@ Standalone backend price server for OPTNWallet. It mirrors the wallet's current 
 - Quote: `USD`
 - Provider priority:
   1. CoinGecko
-  2. CoinCap (missing symbols only)
-  3. CryptoAPIs (remaining symbols only)
+  2. CoinCap
+  3. CryptoAPIs
+- First provider with any quotes wins for that refresh cycle
+- Providers that rate-limit or hard-fail are skipped temporarily to avoid repeated upstream churn
+- Refresh cadence is derived from free-tier monthly budgets and per-minute limits
 - Per-provider timeout and retry
-- Partial-fill fallback (not all-or-nothing)
+- Single-provider failover (no cross-provider stitching per refresh cycle)
+
+## Refresh Cadence
+
+The server does not refresh on every request. It refreshes when the active provider's budget-safe interval has elapsed, then serves cached data between refreshes.
+
+Current free-tier assumptions:
+
+- CoinGecko demo: `10,000` call credits/month, `30` calls/minute
+- CoinCap demo: `4,000` credits/month, `4` calls/minute
+- CryptoAPIs free: `100,000` credits/month, `100` requests/second soft throughput, `270` credits per exchange-rate result
+
+For the default `BTC,BCH,ETH` request set, this means approximately:
+
+- CoinGecko: one refresh every `~4-5 minutes`
+- CoinCap: one refresh every `~11 minutes`
+- CryptoAPIs: one refresh every `~6 hours`
+
+If a refresh fails and there is previous cached data for that pair set, the server keeps serving the last good snapshot instead of dropping to an empty response immediately.
 
 ## Endpoints
 
@@ -58,7 +79,7 @@ Response shape:
 
 ### `GET /health`
 
-Returns process uptime, active cache/retry config, CORS config, and whether provider keys are loaded.
+Returns process uptime, active cache/retry config, whether provider keys are loaded, and the current budget-derived refresh policy.
 
 ## Environment
 

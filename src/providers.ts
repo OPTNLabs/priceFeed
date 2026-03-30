@@ -19,6 +19,11 @@ type ProviderResult = {
   error?: string;
 };
 
+type ProviderFetcher = (
+  bases: BaseSymbol[],
+  ctx: ProviderContext
+) => Promise<ProviderResult>;
+
 const COINGECKO_IDS: Record<BaseSymbol, string> = {
   BTC: 'bitcoin',
   BCH: 'bitcoin-cash',
@@ -31,6 +36,9 @@ const COINCAP_IDS: Record<BaseSymbol, string> = {
   ETH: 'ethereum',
 };
 
+const PROVIDER_COOLDOWN_MS = 5 * 60_000;
+const providerCooldownUntil = new Map<ProviderName, number>();
+
 function invert(obj: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(obj)) out[v] = k;
@@ -39,6 +47,27 @@ function invert(obj: Record<string, string>): Record<string, string> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getProviderCooldown(name: ProviderName, now = Date.now()): number | null {
+  const until = providerCooldownUntil.get(name);
+  if (!until) return null;
+  if (until <= now) {
+    providerCooldownUntil.delete(name);
+    return null;
+  }
+  return until;
+}
+
+function setProviderCooldown(name: ProviderName, now = Date.now()): number {
+  const until = now + PROVIDER_COOLDOWN_MS;
+  providerCooldownUntil.set(name, until);
+  return until;
+}
+
+function shouldCooldownProvider(error?: string): boolean {
+  if (!error) return false;
+  return /429|too many requests|rate limit|fetch failed|timeout|insufficient credits/i.test(error);
 }
 
 async function fetchJsonWithTimeout(
@@ -248,25 +277,42 @@ export async function fetchQuotesWithFallback(
   ctx: ProviderContext
 ): Promise<{ quotes: Quote[]; providerErrors: Partial<Record<ProviderName, string>> }> {
   const unique = Array.from(new Set(bases));
-  const collected = {} as Record<BaseSymbol, Quote>;
   const providerErrors: Partial<Record<ProviderName, string>> = {};
+  const providers: Array<{ name: ProviderName; fetcher: ProviderFetcher }> = [
+    { name: 'coingecko', fetcher: fetchFromCoinGecko },
+    { name: 'coincap', fetcher: fetchFromCoinCap },
+    { name: 'cryptoapis', fetcher: fetchFromCryptoApis },
+  ];
 
-  const cg = await fetchFromCoinGecko(unique, ctx);
-  for (const quote of cg.quotes) collected[quote.base] = quote;
-  if (cg.error) providerErrors.coingecko = cg.error;
+  for (const provider of providers) {
+    const cooldownUntil = getProviderCooldown(provider.name);
+    if (cooldownUntil) {
+      providerErrors[provider.name] = `Skipped after recent upstream failure until ${new Date(cooldownUntil).toISOString()}`;
+      continue;
+    }
 
-  const missingAfterCg = unique.filter((base) => !collected[base]);
-  const cc = await fetchFromCoinCap(missingAfterCg, ctx);
-  for (const quote of cc.quotes) collected[quote.base] = quote;
-  if (cc.error) providerErrors.coincap = cc.error;
+    const result = await provider.fetcher(unique, ctx);
+    if (result.error) {
+      providerErrors[provider.name] = result.error;
+      if (shouldCooldownProvider(result.error)) {
+        setProviderCooldown(provider.name);
+      }
+    }
 
-  const missingAfterCc = unique.filter((base) => !collected[base]);
-  const ca = await fetchFromCryptoApis(missingAfterCc, ctx);
-  for (const quote of ca.quotes) collected[quote.base] = quote;
-  if (ca.error) providerErrors.cryptoapis = ca.error;
+    if (result.quotes.length > 0) {
+      return {
+        quotes: result.quotes,
+        providerErrors,
+      };
+    }
+  }
 
   return {
-    quotes: Object.values(collected),
+    quotes: [],
     providerErrors,
   };
+}
+
+export function resetProviderCooldownsForTest(): void {
+  providerCooldownUntil.clear();
 }

@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import { env } from './env.js';
 import { PriceService } from './priceService.js';
 import { getClientKey, InMemoryRateLimiter, sendRateLimitHeaders } from './rateLimit.js';
+import { getRefreshPolicySnapshot } from './refreshPolicy.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -48,6 +49,7 @@ export async function buildServer() {
   });
 
   app.get('/health', async () => {
+    const defaultAssetCount = 3;
     return {
       status: 'ok',
       service: 'optn-pricefeed-server',
@@ -61,6 +63,15 @@ export async function buildServer() {
         coingecko: Boolean(env.cgApiKey),
         coincap: Boolean(env.coincapApiKey),
         cryptoapis: Boolean(env.cryptoApisKey),
+      },
+      refreshPolicy: {
+        cacheTtlFloorMs: env.cacheTtlMs,
+        defaultAssetCount,
+        providers: {
+          coingecko: getRefreshPolicySnapshot('coingecko', defaultAssetCount, env.cacheTtlMs),
+          coincap: getRefreshPolicySnapshot('coincap', defaultAssetCount, env.cacheTtlMs),
+          cryptoapis: getRefreshPolicySnapshot('cryptoapis', defaultAssetCount, env.cacheTtlMs),
+        },
       },
     };
   });

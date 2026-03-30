@@ -1,6 +1,7 @@
 import { TtlCache } from './cache.js';
 import { env } from './env.js';
 import { fetchQuotesWithFallback } from './providers.js';
+import { getRecommendedRefreshIntervalMs } from './refreshPolicy.js';
 import type { BaseSymbol, PriceDatum, PricesResponse, Quote, QuoteSymbol } from './types.js';
 
 const DEFAULT_BASES: BaseSymbol[] = ['BTC', 'BCH', 'ETH'];
@@ -52,15 +53,18 @@ export class PriceService {
     const cached = this.cache.get(cacheKey);
 
     if (cached) {
+      const ttlMs = this.getEffectiveTtlMs(cached.value.quotes, bases.length);
       return {
         ...cached.value,
         cache: {
           hit: true,
-          ttlMs: env.cacheTtlMs,
+          ttlMs,
           expiresAt: cached.expiresAt,
         },
       };
     }
+
+    const stale = this.cache.peek(cacheKey);
 
     const { quotes, providerErrors } = await fetchQuotesWithFallback(bases, {
       timeoutMs: env.providerTimeoutMs,
@@ -83,15 +87,37 @@ export class PriceService {
       byPair: this.buildByPair(quotes),
     };
 
-    const saved = this.cache.set(cacheKey, payload, env.cacheTtlMs);
+    if (!quotes.length && stale) {
+      const ttlMs = this.getEffectiveTtlMs(stale.value.quotes, bases.length);
+      const saved = this.cache.set(cacheKey, stale.value, ttlMs);
+
+      return {
+        ...stale.value,
+        providerErrors,
+        cache: {
+          hit: true,
+          ttlMs,
+          expiresAt: saved.expiresAt,
+        },
+      };
+    }
+
+    const ttlMs = this.getEffectiveTtlMs(quotes, bases.length);
+    const saved = this.cache.set(cacheKey, payload, ttlMs);
 
     return {
       ...payload,
       cache: {
         hit: false,
-        ttlMs: env.cacheTtlMs,
+        ttlMs,
         expiresAt: saved.expiresAt,
       },
     };
+  }
+
+  private getEffectiveTtlMs(quotes: Quote[], baseCount: number): number {
+    const provider = quotes[0]?.source;
+    if (!provider) return env.cacheTtlMs;
+    return getRecommendedRefreshIntervalMs(provider, baseCount, env.cacheTtlMs);
   }
 }

@@ -7,13 +7,16 @@ export class TtlCache<T> {
   private store = new Map<string, CacheEntry<T>>();
 
   get(key: string): CacheEntry<T> | null {
-    const hit = this.store.get(key);
+    const hit = this.peek(key);
     if (!hit) return null;
     if (Date.now() >= hit.expiresAt) {
-      this.store.delete(key);
       return null;
     }
     return hit;
+  }
+
+  peek(key: string): CacheEntry<T> | null {
+    return this.store.get(key) ?? null;
   }
 
   set(key: string, value: T, ttlMs: number): CacheEntry<T> {
