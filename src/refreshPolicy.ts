@@ -2,18 +2,18 @@ import type { ProviderName } from './types.js';
 
 type ProviderBudget = {
   monthlyCredits: number;
-  perMinuteLimit: number;
+  perMinuteLimit?: number;
   costForRequest: (assetCount: number) => number;
 };
 
 export type RefreshPolicySnapshot = {
   provider: ProviderName;
   monthlyCredits: number;
-  perMinuteLimit: number;
+  perMinuteLimit: number | null;
   requestCost: number;
   monthDurationMs: number;
   monthlyBudgetIntervalMs: number;
-  perMinuteIntervalMs: number;
+  perMinuteIntervalMs: number | null;
   recommendedIntervalMs: number;
 };
 
@@ -21,6 +21,10 @@ const FREE_TIER_BUDGETS: Record<ProviderName, ProviderBudget> = {
   coingecko: {
     monthlyCredits: 10_000,
     perMinuteLimit: 30,
+    costForRequest: () => 1,
+  },
+  freecryptoapi: {
+    monthlyCredits: 100_000,
     costForRequest: () => 1,
   },
   coincap: {
@@ -52,17 +56,19 @@ export function getRefreshPolicySnapshot(
   const requestCost = budget.costForRequest(assetCount);
   const monthDurationMs = getMonthDurationMs(now);
   const monthlyBudgetIntervalMs = Math.ceil((monthDurationMs * requestCost) / budget.monthlyCredits);
-  const perMinuteIntervalMs = Math.ceil(60_000 / budget.perMinuteLimit);
+  const perMinuteIntervalMs = budget.perMinuteLimit
+    ? Math.ceil(60_000 / budget.perMinuteLimit)
+    : null;
 
   return {
     provider,
     monthlyCredits: budget.monthlyCredits,
-    perMinuteLimit: budget.perMinuteLimit,
+    perMinuteLimit: budget.perMinuteLimit ?? null,
     requestCost,
     monthDurationMs,
     monthlyBudgetIntervalMs,
     perMinuteIntervalMs,
-    recommendedIntervalMs: Math.max(ttlFloorMs, monthlyBudgetIntervalMs, perMinuteIntervalMs),
+    recommendedIntervalMs: Math.max(ttlFloorMs, monthlyBudgetIntervalMs, perMinuteIntervalMs ?? 0),
   };
 }
 

@@ -8,8 +8,9 @@ Standalone backend price server for OPTNWallet. It mirrors the wallet's current 
 - Quote: `USD`
 - Provider priority:
   1. CoinGecko
-  2. CoinCap
-  3. CryptoAPIs
+  2. FreeCryptoAPI
+  3. CoinCap
+  4. CryptoAPIs
 - First provider with any quotes wins for that refresh cycle
 - Providers that rate-limit or hard-fail are skipped temporarily to avoid repeated upstream churn
 - Refresh cadence is derived from free-tier monthly budgets and per-minute limits
@@ -23,12 +24,14 @@ The server does not refresh on every request. It refreshes when the active provi
 Current free-tier assumptions:
 
 - CoinGecko demo: `10,000` call credits/month, `30` calls/minute
+- FreeCryptoAPI basic: `100,000` requests/month
 - CoinCap demo: `4,000` credits/month, `4` calls/minute
 - CryptoAPIs free: `100,000` credits/month, `100` requests/second soft throughput, `270` credits per exchange-rate result
 
 For the default `BTC,BCH,ETH` request set, this means approximately:
 
 - CoinGecko: one refresh every `~4-5 minutes`
+- FreeCryptoAPI: one refresh every `~27 seconds`, but the configured cache floor keeps this at `45 seconds`
 - CoinCap: one refresh every `~11 minutes`
 - CryptoAPIs: one refresh every `~6 hours`
 
@@ -98,6 +101,7 @@ RETRY_BACKOFF_MS=250
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=120
 CG_API_KEY=xxxxx
+FREECRYPTOAPI_API_KEY=xxxxx
 COINCAP_API_KEY=xxxxx
 CRYPTOAPIS_KEY=xxxxx
 ```

@@ -18,6 +18,15 @@ describe('getRefreshPolicySnapshot', () => {
     expect(snapshot.recommendedIntervalMs).toBe(669_600);
   });
 
+  it('computes FreeCryptoAPI refresh interval from monthly budget', () => {
+    const snapshot = getRefreshPolicySnapshot('freecryptoapi', 3, 45_000, Date.UTC(2026, 2, 1));
+
+    expect(snapshot.requestCost).toBe(1);
+    expect(snapshot.monthlyBudgetIntervalMs).toBe(26_784);
+    expect(snapshot.perMinuteIntervalMs).toBeNull();
+    expect(snapshot.recommendedIntervalMs).toBe(45_000);
+  });
+
   it('scales CryptoAPIs refresh interval by requested asset count', () => {
     const snapshot = getRefreshPolicySnapshot('cryptoapis', 3, 45_000, Date.UTC(2026, 2, 1));
 

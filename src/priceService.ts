@@ -72,6 +72,7 @@ export class PriceService {
       retryBackoffMs: env.retryBackoffMs,
       keys: {
         cgApiKey: env.cgApiKey,
+        freeCryptoApiKey: env.freeCryptoApiKey,
         coincapApiKey: env.coincapApiKey,
         cryptoApisKey: env.cryptoApisKey,
       },

@@ -43,6 +43,7 @@ export const env = {
   rateLimitWindowMs: intEnv('RATE_LIMIT_WINDOW_MS', 60_000),
   rateLimitMax: intEnv('RATE_LIMIT_MAX', 120),
   cgApiKey: strEnv('CG_API_KEY'),
+  freeCryptoApiKey: strEnv('FREECRYPTOAPI_API_KEY') || strEnv('FREECRYPTPOAPI_API_KEY'),
   coincapApiKey: strEnv('COINCAP_API_KEY'),
   cryptoApisKey: strEnv('CRYPTOAPIS_KEY'),
 };

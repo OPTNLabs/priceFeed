@@ -1,6 +1,6 @@
 export type BaseSymbol = 'BTC' | 'BCH' | 'ETH';
 export type QuoteSymbol = 'USD';
-export type ProviderName = 'coingecko' | 'coincap' | 'cryptoapis';
+export type ProviderName = 'coingecko' | 'freecryptoapi' | 'coincap' | 'cryptoapis';
 
 export type Quote = {
   base: BaseSymbol;

@@ -61,6 +61,7 @@ export async function buildServer() {
       corsAllowedOrigins: env.corsAllowedOrigins,
       keys: {
         coingecko: Boolean(env.cgApiKey),
+        freecryptoapi: Boolean(env.freeCryptoApiKey),
         coincap: Boolean(env.coincapApiKey),
         cryptoapis: Boolean(env.cryptoApisKey),
       },
@@ -69,6 +70,7 @@ export async function buildServer() {
         defaultAssetCount,
         providers: {
           coingecko: getRefreshPolicySnapshot('coingecko', defaultAssetCount, env.cacheTtlMs),
+          freecryptoapi: getRefreshPolicySnapshot('freecryptoapi', defaultAssetCount, env.cacheTtlMs),
           coincap: getRefreshPolicySnapshot('coincap', defaultAssetCount, env.cacheTtlMs),
           cryptoapis: getRefreshPolicySnapshot('cryptoapis', defaultAssetCount, env.cacheTtlMs),
         },

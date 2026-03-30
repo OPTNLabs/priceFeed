@@ -9,6 +9,7 @@ type ProviderContext = {
   fetchFn?: FetchFn;
   keys: {
     cgApiKey?: string;
+    freeCryptoApiKey?: string;
     coincapApiKey?: string;
     cryptoApisKey?: string;
   };
@@ -218,6 +219,60 @@ async function fetchFromCoinCap(
   }
 }
 
+async function fetchFromFreeCryptoApi(
+  bases: BaseSymbol[],
+  ctx: ProviderContext
+): Promise<ProviderResult> {
+  if (!bases.length) return { quotes: [] };
+
+  if (!ctx.keys.freeCryptoApiKey) {
+    return { quotes: [], error: 'freecryptoapi missing API key' };
+  }
+
+  const fetchFn = ctx.fetchFn ?? fetch;
+  const symbol = bases.join('+');
+  const params = new URLSearchParams({ symbol });
+  const url = `https://api.freecryptoapi.com/v1/getData?${params.toString()}`;
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    Authorization: `Bearer ${ctx.keys.freeCryptoApiKey}`,
+  };
+
+  try {
+    const json = await withRetries(
+      'freecryptoapi',
+      () => fetchJsonWithTimeout(url, { method: 'GET', headers }, ctx.timeoutMs, fetchFn),
+      ctx.retries,
+      ctx.retryBackoffMs
+    );
+
+    const rows = Array.isArray((json as { symbols?: unknown[] }).symbols)
+      ? ((json as { symbols?: unknown[] }).symbols as unknown[])
+      : [];
+
+    const now = Date.now();
+
+    const quotes: Quote[] = rows
+      .map((row) => {
+        const base = String((row as { symbol?: unknown }).symbol ?? '') as BaseSymbol;
+        const price = Number((row as { last?: unknown }).last);
+        if (!bases.includes(base) || !Number.isFinite(price)) return null;
+        return {
+          base,
+          quote: 'USD',
+          price,
+          ts: now,
+          source: 'freecryptoapi',
+        } as Quote;
+      })
+      .filter(Boolean) as Quote[];
+
+    return { quotes };
+  } catch (error) {
+    return { quotes: [], error: (error as Error).message };
+  }
+}
+
 async function fetchFromCryptoApis(
   bases: BaseSymbol[],
   ctx: ProviderContext
@@ -280,6 +335,7 @@ export async function fetchQuotesWithFallback(
   const providerErrors: Partial<Record<ProviderName, string>> = {};
   const providers: Array<{ name: ProviderName; fetcher: ProviderFetcher }> = [
     { name: 'coingecko', fetcher: fetchFromCoinGecko },
+    { name: 'freecryptoapi', fetcher: fetchFromFreeCryptoApi },
     { name: 'coincap', fetcher: fetchFromCoinCap },
     { name: 'cryptoapis', fetcher: fetchFromCryptoApis },
   ];
