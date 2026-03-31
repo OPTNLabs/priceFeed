@@ -230,9 +230,8 @@ async function fetchFromFreeCryptoApi(
   }
 
   const fetchFn = ctx.fetchFn ?? fetch;
-  const symbol = bases.join('+');
-  const params = new URLSearchParams({ symbol });
-  const url = `https://api.freecryptoapi.com/v1/getData?${params.toString()}`;
+  const symbol = bases.map((base) => encodeURIComponent(base)).join('+');
+  const url = `https://api.freecryptoapi.com/v1/getData?symbol=${symbol}`;
   const headers: Record<string, string> = {
     accept: 'application/json',
     Authorization: `Bearer ${ctx.keys.freeCryptoApiKey}`,
